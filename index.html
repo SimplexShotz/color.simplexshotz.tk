@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+  <head>
+
+    <title>Color Game</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit&display=swap" rel="stylesheet">
+
+    <!-- Polyfill for mobile drag and drop -->
+    <script src="http://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js"></script>
+
+    <style>
+
+      body {
+        display: flex;
+        background-color: rgb(230, 230, 230);
+        width: 100vw;
+        height: 100vh;
+        margin: 0px;
+        padding: 0px;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        font-family: "Outfit";
+        overflow: hidden;
+      }
+
+      #gamepad {
+        display: flex;
+        flex-wrap: wrap;
+        background-color: rgb(255, 255, 255);
+        width: calc(100vw - 50px);
+        height: calc(100vh - 120px);
+        margin-bottom: 20px;
+      }
+
+      .button-container {
+        display: flex;
+      }
+
+      .button {
+        background-color: rgb(5, 65, 100);
+        color: rgb(255, 255, 255);
+        padding: 10px 20px;
+        margin: 0px 10px;
+        border-radius: 5px;
+        font-size: 2em;
+      }
+
+      .anchor {
+        background-color: rgb(0, 0, 0);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+      }
+
+      .tile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: top 0.5s, left 0.5s;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div id="gamepad"></div>
+    <div class="button-container">
+      <div class="button" id="newGame">New Game</div>
+      <div class="button" id="autoSolve">Auto Solve</div>
+    </div>
+    <script>
+
+      let dragging, gamepad;
+
+      generateGamepad(7, 10, generateColorArray(2, 2, 200), 4);
+
+      function generateGamepad(w, h, colorArray, anchors) {
+
+        gamepad = {
+          w: w,
+          h: h,
+          anchorArray: []
+        };
+
+        let anchorArray = [];
+
+        switch(anchors) {
+          case 0:
+            // No anchors.
+          break;
+          case 1:
+            anchorArray.push(`${Math.floor(w / 2)}-${Math.floor(h / 2)}`);
+          break;
+          default:
+            for (let x = 0; x < anchors; x++) {
+              for (let y = 0; y < anchors; y++) {
+                anchorArray.push(`${Math.floor(x / (anchors - 1) * (w - 1))}-${Math.floor(y / (anchors - 1) * (h - 1))}`);
+              }
+            }
+          break;
+        }
+
+        gamepad.anchorArray = anchorArray;
+
+        let div, col;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            col = getColorAtPos(colorArray, {
+              x: x,
+              y: y,
+              w: w,
+              h: h
+            });
+
+            div = document.createElement("div");
+            div.innerHTML = `<div class="tile" id="tile-${x}-${y}" style="background-color: rgb(${col.r}, ${col.g}, ${col.b}); border: 1px solid rgb(${col.r}, ${col.g}, ${col.b}); width: calc(100% / ${w} - 2px); height: calc(100% / ${h} - 2px);" ${anchorArray.indexOf(`${x}-${y}`) === -1 ? `draggable="true"` : ``}>${anchorArray.indexOf(`${x}-${y}`) !== -1 ? `<div class="anchor"></div>` : ``}</div>`;
+            document.getElementById("gamepad").appendChild(div.childNodes[0]);
+          }
+        }
+
+        let tiles = document.getElementsByClassName("tile");
+        for (let i = 0; i < tiles.length; i++) {
+          if (anchorArray.indexOf(tiles[i].id.split("-").splice(1).join("-")) === -1) {
+            addListeners(tiles[i]);
+          }
+        }
+
+        shuffleGamepad(Math.floor(Math.random() * 50 + 25));
+
+      }
+
+      function shuffleGamepad(n) {
+
+        let i, breakout, tile1ID, tile2ID;
+
+        for (i = 0; i < n; i++) {
+          breakout = 0;
+          while (breakout < 100) {
+            tile1ID = `${Math.floor(Math.random() * gamepad.w)}-${Math.floor(Math.random() * gamepad.h)}`;
+            tile2ID = `${Math.floor(Math.random() * gamepad.w)}-${Math.floor(Math.random() * gamepad.h)}`;
+
+            if (tile1ID !== tile2ID && gamepad.anchorArray.indexOf(tile1ID) === -1 && gamepad.anchorArray.indexOf(tile2ID) === -1) {
+              swapTiles(`tile-${tile1ID}`, `tile-${tile2ID}`);
+              break;
+            }
+
+            breakout++;
+          }
+        }
+
+      }
+      function autoSolveGamepad() {
+
+        let solve = setInterval(function() {
+          singleSolve(solve);
+        }, 1000);
+
+        singleSolve();
+      }
+      function singleSolve(int) {
+
+        let tiles = document.getElementsByClassName("tile");
+        for (let i = 0; i < tiles.length; i++) {
+
+          console.log(tiles[i].id.split("-")[1]);
+          console.log(i % gamepad.w);
+          console.log(tiles[i].id.split("-")[2]);
+          console.log(Math.floor(i / gamepad.w));
+
+          // Tile is in the wrong spot!
+          if (tiles[i].id.split("-")[1] !== i % gamepad.w && tiles[i].id.split("-")[2] !== Math.floor(i / gamepad.w)) {
+            swapTiles(tiles[i].id, `tile-${i % gamepad.w}-${Math.floor(i / gamepad.w)}`, 2);
+            return;
+          }
+
+        }
+
+        if (int)
+          clearInterval(int);
+
+      }
+
+      function addListeners(el) {
+
+        el.addEventListener("dragstart", function(e) {
+          startDrag(e);
+        });
+        el.addEventListener("dragover", function(e) {
+          e.preventDefault();
+        });
+        el.addEventListener("drop", function(e) {
+          endDrag(e);
+        });
+      }
+
+      function startDrag(e, mobile) {
+
+        dragging = e.target.id;
+      }
+      function endDrag(e, mobile) {
+
+        if (!dragging)
+          return;
+
+        swapTiles(dragging, e.target.id, 1);
+
+        dragging = false;
+      }
+
+      function swapTiles(fromID, toID, animate) {
+
+        if (fromID === toID)
+          return;
+
+        /*
+
+          "animate" has 3 options:
+            0 : no animation
+            1 : only animate the "toNode" tile
+            2 : animate both tiles
+
+        */
+
+        let fromNode = document.getElementById(fromID);
+        let toNode = document.getElementById(toID);
+
+        let tempToNode, tempFromNode;
+
+        if (animate) {
+          tempToNode = toNode.parentNode.insertBefore(toNode.cloneNode(), fromNode);
+          tempToNode.id = tempToNode.id + "-temp";
+          tempToNode.style.backgroundColor = "rgb(230, 230, 230)";
+        }
+        if (animate === 2) {
+          tempFromNode = fromNode.parentNode.insertBefore(fromNode.cloneNode(), toNode);
+          tempFromNode.id = tempFromNode.id + "-temp";
+          tempFromNode.style.backgroundColor = "rgb(230, 230, 230)";
+        }
+
+        toNode.parentNode.insertBefore(toNode.cloneNode(), fromNode);
+        fromNode.parentNode.insertBefore(fromNode, toNode);
+
+        toNode.remove();
+
+        switch(animate) {
+          case 2:
+            document.getElementById(fromID).style.position = "absolute";
+            document.getElementById(fromID).style.top = tempToNode.offsetTop + "px";
+            document.getElementById(fromID).style.left = tempToNode.offsetLeft + "px";
+            document.getElementById(fromID).style.width = tempFromNode.offsetWidth + "px";
+            document.getElementById(fromID).style.height = tempFromNode.offsetHeight + "px";
+
+            setTimeout(function() {
+              document.getElementById(fromID).style.top = tempFromNode.offsetTop + "px";
+              document.getElementById(fromID).style.left = tempFromNode.offsetLeft + "px";
+              setTimeout(function() {
+                document.getElementById(fromID).style.position = "static";
+                document.getElementById(fromID).style.top = "";
+                document.getElementById(fromID).style.left = "";
+                document.getElementById(fromID).style.width = `calc(100% / ${gamepad.w} - 2px)`;
+                document.getElementById(fromID).style.height = `calc(100% / ${gamepad.h} - 2px)`;
+                document.getElementById(fromID + "-temp").remove();
+              }, 500);
+            }, 0);
+
+          // Passthrough case 2:
+          case 1:
+            document.getElementById(toID).style.position = "absolute";
+            if (animate === 2) {
+              document.getElementById(toID).style.top = tempFromNode.offsetTop + "px";
+              document.getElementById(toID).style.left = tempFromNode.offsetLeft + "px";
+            } else {
+              document.getElementById(toID).style.top = fromNode.offsetTop + "px";
+              document.getElementById(toID).style.left = fromNode.offsetLeft + "px";
+            }
+            document.getElementById(toID).style.width = tempToNode.offsetWidth + "px";
+            document.getElementById(toID).style.height = tempToNode.offsetHeight + "px";
+
+            setTimeout(function() {
+              document.getElementById(toID).style.top = tempToNode.offsetTop + "px";
+              document.getElementById(toID).style.left = tempToNode.offsetLeft + "px";
+              setTimeout(function() {
+                document.getElementById(toID).style.position = "static";
+                document.getElementById(toID).style.top = "";
+                document.getElementById(toID).style.left = "";
+                document.getElementById(toID).style.width = `calc(100% / ${gamepad.w} - 2px)`;
+                document.getElementById(toID).style.height = `calc(100% / ${gamepad.h} - 2px)`;
+                document.getElementById(toID + "-temp").remove();
+              }, 500);
+            }, 0);
+          break;
+        }
+
+        addListeners(document.getElementById(fromID));
+        addListeners(document.getElementById(toID));
+      }
+
+      function getColorAtPos(colors, pos) {
+
+        let pX = pos.x / (pos.w - 1) * (colors[0].length - 1) || 0;
+        let pY = pos.y / (pos.h - 1) * (colors.length - 1) || 0;
+
+        let tX = Math.floor(pX);
+        let tY = Math.floor(pY);
+
+        let cX = pX - tX;
+        let cY = pY - tY;
+
+        let colY1 = interpColor(colors[tY][tX], colors[tY + 1] ? colors[tY + 1][tX] : colors[tY][tX], cY);
+        let colY2 = interpColor(colors[tY][tX + 1] || colors[tY][tX], colors[tY + 1] ? (colors[tY + 1][tX + 1] || colors[tY + 1][tX]) : colors[tY][tX], cY);
+
+        return interpColor(colY1, colY2, cX);
+      }
+
+      function interpColor(color1, color2, p) {
+
+        return {
+          r: color1.r + (color2.r - color1.r) * p,
+          g: color1.g + (color2.g - color1.g) * p,
+          b: color1.b + (color2.b - color1.b) * p
+        };
+      }
+
+      function generateColorArray(w, h, d) {
+
+        let returnArray, complete = false, x, y, xo, yo, xi, yi;
+
+        while (!complete) {
+
+          returnArray = [];
+
+          for (y = 0; y < h; y++) {
+            returnArray.push([]);
+            for (x = 0; x < w; x++) {
+              returnArray[y].push({
+                r: Math.random() * 255,
+                g: Math.random() * 255,
+                b: Math.random() * 255
+              });
+            }
+          }
+
+          // Re-generate the color array if the colors are too close in color
+          complete = true;
+          loop: for (yo = 0; yo < h; yo++) {
+            for (xo = 0; xo < w; xo++) {
+
+              for (yi = 0; yi < h; yi++) {
+                for (xi = 0; xi < w; xi++) {
+                  if (!(xo === xi && yo === yi) && calculateColorDistance(returnArray[yo][xo], returnArray[yi][xi]) <= Math.pow(d, 2)) {
+                    complete = false;
+                    break loop;
+                  }
+                }
+              }
+
+            }
+          }
+
+          // Prevent infinite loops; eventually, a grid will generate
+          d--;
+
+        }
+
+        return returnArray;
+      }
+
+      function calculateColorDistance(color1, color2) {
+        return Math.pow(color1.r - color2.r, 2) + Math.pow(color1.g - color2.g, 2) + Math.pow(color1.b - color2.b, 2);
+      }
+
+      document.getElementById("autoSolve").addEventListener("click", function() {
+        autoSolveGamepad();
+      });
+
+    </script>
+  </body>
+</html>
