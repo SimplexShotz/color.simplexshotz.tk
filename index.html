@@ -97,6 +97,7 @@
       let uid = new Date().getTime() + "_" + Math.floor(Math.random() * 1000000);
       let appliedChanges = [];
       let gamepadCheckDelay = 0;
+      let lastMove = 0;
 
       window.addEventListener("load", async function() {
 
@@ -260,7 +261,8 @@
 
           // Tile is in the wrong spot!
           if (Number(tiles[i].id.split("-")[1]) !== i % gamepad.w || Number(tiles[i].id.split("-")[2]) !== Math.floor(i / gamepad.w)) {
-            swapTiles(tiles[i].id, `tile-${i % gamepad.w}-${Math.floor(i / gamepad.w)}`, 2);
+            pushAnimation(tiles[i].id, `tile-${i % gamepad.w}-${Math.floor(i / gamepad.w)}`, 2);
+            animate();
             return;
           }
 
@@ -293,10 +295,12 @@
         if (!dragging)
           return;
 
-        if (dragging === e.target.id) {
+        if (dragging === e.target.id || (new Date().getTime()) - lastMove <= 500) {
           dragging = false;
           return;
         }
+
+        lastMove = new Date().getTime();
 
         set(push(child(ref(db), "games/default/changes")), {
           header: {
@@ -355,7 +359,9 @@
           if (animationBuffer.length === 0)
             clearInterval(int);
 
-        }, 500);
+          set(ref(db, "games/default/gamepad/tiles"), getTiles());
+
+        }, 510);
 
       }
 
