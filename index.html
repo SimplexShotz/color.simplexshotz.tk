@@ -601,7 +601,9 @@
         generateGamepad(9, 11, generateColorArray(2, 2, 200), 3, "gradient");
       });
       document.getElementById("autoSolve").addEventListener("click", function() {
-        autoSolveGamepad();
+        if (prompt("This feature has been limited because it currently is not fully implemented. Enter the password to continue:") === "S0lv3") {
+          autoSolveGamepad();
+        }
       });
 
     </script>
