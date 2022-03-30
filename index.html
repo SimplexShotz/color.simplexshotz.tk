@@ -76,7 +76,7 @@
 
       let dragging, gamepad;
 
-      generateGamepad(7, 10, generateColorArray(2, 2, 200), 4);
+      generateGamepad(9, 11, generateColorArray(2, 2, 200), 3);
 
       function generateGamepad(w, h, colorArray, anchors) {
 
@@ -362,7 +362,7 @@
           }
 
           // Prevent infinite loops; eventually, a grid will generate
-          d--;
+          d -= 0.1;
 
         }
 
