@@ -96,6 +96,7 @@
       let animationBuffer = [];
       let uid = new Date().getTime() + "_" + Math.floor(Math.random() * 1000000);
       let appliedChanges = [];
+      let gamepadCheckDelay = 0;
 
       window.addEventListener("load", async function() {
 
@@ -111,12 +112,33 @@
 
         loadGamepad();
 
+        setInterval(async function() {
+
+          let localTilesData = getTiles();
+          let realTilesData = await getData("games/default/gamepad/tiles", function(err) { console.error(err); });
+
+          for (let i = 0; i < localTilesData.length; i++) {
+            if (localTilesData[i] !== realTilesData[i]) {
+              gamepadCheckDelay++;
+              break;
+            }
+          }
+
+          if (gamepadCheckDelay >= 4) {
+            loadGamepad();
+            gamepadCheckDelay = 0;
+          }
+
+        }, 500);
+
       });
 
       async function loadGamepad(firstLoad) {
 
         if (!firstLoad)
           gamepad = await getData("games/default/gamepad", function(err) { console.error(err); });
+
+        document.getElementById("gamepad").innerHTML = "";
 
         let div, col;
         for (let i = 0; i < gamepad.tiles.length; i++) {
@@ -152,8 +174,6 @@
       }
 
       function generateGamepad(w, h, colorArray, anchors, colorMode) {
-
-        document.getElementById("gamepad").innerHTML = "";
 
         gamepad = {
           w: w,
