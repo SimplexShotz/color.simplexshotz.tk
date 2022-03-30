@@ -117,12 +117,19 @@
           let localTilesData = getTiles();
           let realTilesData = await getData("games/default/gamepad/tiles", function(err) { console.error(err); });
 
-          for (let i = 0; i < localTilesData.length; i++) {
+          let i;
+          for (i = 0; i < localTilesData.length; i++) {
             if (localTilesData[i] !== realTilesData[i]) {
               gamepadCheckDelay++;
               break;
             }
           }
+
+          if (i === localTilesData.length) {
+            gamepadCheckDelay = 0;
+          }
+
+          console.log(gamepadCheckDelay);
 
           if (gamepadCheckDelay >= 4) {
             loadGamepad();
