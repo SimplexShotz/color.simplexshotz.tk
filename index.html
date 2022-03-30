@@ -72,19 +72,103 @@
       <div class="button" id="newGame">New Game</div>
       <div class="button" id="autoSolve">Auto Solve</div>
     </div>
-    <script>
+    <script type="module">
+
+      // Import the functions you need from the SDKs you need
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+      import { getDatabase, set, get, ref, query, onValue, child, push, remove } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-database.js";
+
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyCBJBHVthTul3F3RCQWTj2_vlUlnPtuWjw",
+        authDomain: "colorgame-5245d.firebaseapp.com",
+        projectId: "colorgame-5245d",
+        storageBucket: "colorgame-5245d.appspot.com",
+        messagingSenderId: "699217234331",
+        appId: "1:699217234331:web:ea4f682dad689fc3eb393e"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
 
       let dragging, gamepad;
+      let animationBuffer = [];
+      let uid = new Date().getTime() + "_" + Math.floor(Math.random() * 1000000);
+      let appliedChanges = [];
 
-      generateGamepad(9, 11, generateColorArray(2, 2, 200), 3);
+      window.addEventListener("load", async function() {
 
-      function generateGamepad(w, h, colorArray, anchors) {
+        let changesObj = await getData("games/default/changes", function(err) { console.error(err); });
+        for (let i in changesObj) {
+          appliedChanges.push(i);
+        }
+
+        onValue(ref(db, "games/default/changes"), (snapshot) => {
+          const changes = snapshot.val();
+          handleChanges(changes);
+        });
+
+        loadGamepad();
+
+      });
+
+      async function loadGamepad(firstLoad) {
+
+        if (!firstLoad)
+          gamepad = await getData("games/default/gamepad", function(err) { console.error(err); });
+
+        let div, col;
+        for (let i = 0; i < gamepad.tiles.length; i++) {
+          let x = Number(gamepad.tiles[i].split("-")[1]);
+          let y = Number(gamepad.tiles[i].split("-")[2]);
+
+          div = document.createElement("div");
+          switch(gamepad.colorMode) {
+            case "gradient":
+              col = [getColorAtPos(gamepad.colorArray, { x: x + 0.5, y: y + 0.5, w: gamepad.w, h: gamepad.h }), getColorAtPos(gamepad.colorArray, { x: x, y: y, w: gamepad.w, h: gamepad.h }), getColorAtPos(gamepad.colorArray, { x: x + 1, y: y, w: gamepad.w, h: gamepad.h }), getColorAtPos(gamepad.colorArray, { x: x, y: y + 1, w: gamepad.w, h: gamepad.h }), getColorAtPos(gamepad.colorArray, { x: x + 1, y: y + 1, w: gamepad.w, h: gamepad.h })];
+              div.innerHTML = `<div class="tile" id="tile-${x}-${y}" style="background: linear-gradient(to top left, rgb(${col[4].r}, ${col[4].g}, ${col[4].b}), rgba(${col[0].r}, ${col[0].g}, ${col[0].b}, 0), rgb(${col[1].r}, ${col[1].g}, ${col[1].b})), linear-gradient(to top right, rgb(${col[3].r}, ${col[3].g}, ${col[3].b}), rgba(${col[0].r}, ${col[0].g}, ${col[0].b}, 0), rgb(${col[2].r}, ${col[2].g}, ${col[2].b})) rgba(${col[0].r}, ${col[0].g}, ${col[0].b}, 1); width: calc(100% / ${gamepad.w}); height: calc(100% / ${gamepad.h});" ${gamepad.anchorArray.indexOf(`${x}-${y}`) === -1 ? `draggable="true"` : ``}>${gamepad.anchorArray.indexOf(`${x}-${y}`) !== -1 ? `<div class="anchor"></div>` : ``}</div>`;
+            break;
+            default:
+              col = getColorAtPos(gamepad.colorArray, {
+                x: x,
+                y: y,
+                w: gamepad.w,
+                h: gamepad.h
+              });
+              div.innerHTML = `<div class="tile" id="tile-${x}-${y}" style="background-color: rgb(${col.r}, ${col.g}, ${col.b}); border: 1px solid rgb(${col.r}, ${col.g}, ${col.b}); width: calc(100% / ${gamepad.w} - 2px); height: calc(100% / ${gamepad.h} - 2px);" ${gamepad.anchorArray.indexOf(`${x}-${y}`) === -1 ? `draggable="true"` : ``}>${gamepad.anchorArray.indexOf(`${x}-${y}`) !== -1 ? `<div class="anchor"></div>` : ``}</div>`;
+            break;
+          }
+          document.getElementById("gamepad").appendChild(div.childNodes[0]);
+        }
+
+        let tiles = document.getElementsByClassName("tile");
+        for (let i = 0; i < tiles.length; i++) {
+          if (gamepad.anchorArray.indexOf(tiles[i].id.split("-").splice(1).join("-")) === -1) {
+            addListeners(tiles[i]);
+          }
+        }
+
+      }
+
+      function generateGamepad(w, h, colorArray, anchors, colorMode) {
+
+        document.getElementById("gamepad").innerHTML = "";
 
         gamepad = {
           w: w,
           h: h,
-          anchorArray: []
+          colorArray: colorArray,
+          colorMode: colorMode,
+          anchorArray: [],
+          tilePositions: [],
+          minGuesses: Math.floor(Math.random() * 50 + 25),
+          tiles: []
         };
+
+        for (let i = 0; i < w * h; i++) {
+          gamepad.tiles.push(`tile-${i % gamepad.w}-${Math.floor(i / gamepad.w)}`);
+        }
 
         let anchorArray = [];
 
@@ -106,30 +190,13 @@
 
         gamepad.anchorArray = anchorArray;
 
-        let div, col;
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            col = getColorAtPos(colorArray, {
-              x: x,
-              y: y,
-              w: w,
-              h: h
-            });
+        loadGamepad(true);
 
-            div = document.createElement("div");
-            div.innerHTML = `<div class="tile" id="tile-${x}-${y}" style="background-color: rgb(${col.r}, ${col.g}, ${col.b}); border: 1px solid rgb(${col.r}, ${col.g}, ${col.b}); width: calc(100% / ${w} - 2px); height: calc(100% / ${h} - 2px);" ${anchorArray.indexOf(`${x}-${y}`) === -1 ? `draggable="true"` : ``}>${anchorArray.indexOf(`${x}-${y}`) !== -1 ? `<div class="anchor"></div>` : ``}</div>`;
-            document.getElementById("gamepad").appendChild(div.childNodes[0]);
-          }
-        }
+        shuffleGamepad(gamepad.minGuesses);
 
-        let tiles = document.getElementsByClassName("tile");
-        for (let i = 0; i < tiles.length; i++) {
-          if (anchorArray.indexOf(tiles[i].id.split("-").splice(1).join("-")) === -1) {
-            addListeners(tiles[i]);
-          }
-        }
+        gamepad.tiles = getTiles();
 
-        shuffleGamepad(Math.floor(Math.random() * 50 + 25));
+        set(ref(db, "games/default/gamepad"), gamepad);
 
       }
 
@@ -157,7 +224,7 @@
 
         let solve = setInterval(function() {
           singleSolve(solve);
-        }, 750);
+        }, 550);
 
         singleSolve();
       }
@@ -166,14 +233,8 @@
         let tiles = document.getElementsByClassName("tile");
         for (let i = 0; i < tiles.length; i++) {
 
-          console.log(Number(tiles[i].id.split("-")[1]) !== i % gamepad.w);
-          console.log();
-          console.log(tiles[i].id.split("-")[2]);
-          console.log(Math.floor(i / gamepad.w));
-
           // Tile is in the wrong spot!
-          if (Number(tiles[i].id.split("-")[1]) !== i % gamepad.w && Number(tiles[i].id.split("-")[2]) !== Math.floor(i / gamepad.w)) {
-            console.log("G");
+          if (Number(tiles[i].id.split("-")[1]) !== i % gamepad.w || Number(tiles[i].id.split("-")[2]) !== Math.floor(i / gamepad.w)) {
             swapTiles(tiles[i].id, `tile-${i % gamepad.w}-${Math.floor(i / gamepad.w)}`, 2);
             return;
           }
@@ -207,9 +268,120 @@
         if (!dragging)
           return;
 
-        swapTiles(dragging, e.target.id, 1);
+        if (dragging === e.target.id) {
+          dragging = false;
+          return;
+        }
+
+        set(push(child(ref(db), "games/default/changes")), {
+          header: {
+            action: "swap",
+            uid: uid,
+            timestamp: new Date().getTime()
+          },
+          data: {
+            tile1ID: dragging,
+            tile2ID: e.target.id
+          }
+        });
+
+        let tiles = getTiles();
+        let tempIndex = tiles.indexOf(e.target.id);
+        tiles[tiles.indexOf(dragging)] = e.target.id;
+        tiles[tempIndex] = dragging;
+
+        set(ref(db, "games/default/gamepad/tiles"), tiles);
+
+        pushAnimation(dragging, e.target.id, animationBuffer.length > 0 ? 2 : 1);
+        animate();
 
         dragging = false;
+      }
+
+      function animate() {
+
+        // Don't animate if there is nothing to animate, or an animation is already in progress
+        if (animationBuffer.length !== 1) {
+          return;
+        }
+
+        let animationInt = setInterval(function() {
+          singleAnimate(animationInt);
+        }, 550);
+
+        singleAnimate(animationInt);
+
+      }
+      function singleAnimate(int) {
+
+        if (animationBuffer.length === 0) {
+          clearInterval(int);
+          return;
+        }
+
+        swapTiles(animationBuffer[0].fromID, animationBuffer[0].toID, animationBuffer[0].animate);
+
+        setTimeout(function() {
+
+          animationBuffer.splice(0, 1);
+
+          if (animationBuffer.length === 0)
+            clearInterval(int);
+
+        }, 500);
+
+      }
+
+      function pushAnimation(fromID, toID, animate) {
+
+        if (fromID === toID)
+          return;
+
+        animationBuffer.push({
+          fromID: fromID,
+          toID: toID,
+          animate: animate
+        });
+
+      }
+
+      function getTiles() {
+
+        let tileArray = [];
+        let tiles = document.getElementsByClassName("tile");
+        for (let i = 0; i < tiles.length; i++) {
+          tileArray.push(tiles[i].id);
+        }
+
+        return tileArray;
+      }
+
+      function handleChanges(changes) {
+
+        let changesToApply = [];
+
+        for (let i in changes) {
+
+          if (appliedChanges.indexOf(i) !== -1)
+            continue;
+
+          appliedChanges.push(i);
+          changesToApply.push(changes[i]);
+
+        }
+
+        for (let i = 0; i < changesToApply.length; i++) {
+          if (changesToApply[i].header.uid === uid)
+            continue;
+
+          switch(changesToApply[i].header.action) {
+            case "swap":
+              pushAnimation(changesToApply[i].data.tile1ID, changesToApply[i].data.tile2ID, 2);
+              animate();
+            break;
+          }
+        }
+
       }
 
       function swapTiles(fromID, toID, animate) {
@@ -262,8 +434,8 @@
                 document.getElementById(fromID).style.position = "static";
                 document.getElementById(fromID).style.top = "";
                 document.getElementById(fromID).style.left = "";
-                document.getElementById(fromID).style.width = `calc(100% / ${gamepad.w} - 2px)`;
-                document.getElementById(fromID).style.height = `calc(100% / ${gamepad.h} - 2px)`;
+                document.getElementById(fromID).style.width = `calc(100% / ${gamepad.w}${gamepad.colorMode === "gradient" ? `` : `- 2px`})`;
+                document.getElementById(fromID).style.height = `calc(100% / ${gamepad.h}${gamepad.colorMode === "gradient" ? `` : `- 2px`})`;
                 document.getElementById(fromID + "-temp").remove();
               }, 500);
             }, 0);
@@ -288,8 +460,8 @@
                 document.getElementById(toID).style.position = "static";
                 document.getElementById(toID).style.top = "";
                 document.getElementById(toID).style.left = "";
-                document.getElementById(toID).style.width = `calc(100% / ${gamepad.w} - 2px)`;
-                document.getElementById(toID).style.height = `calc(100% / ${gamepad.h} - 2px)`;
+                document.getElementById(toID).style.width = `calc(100% / ${gamepad.w}${gamepad.colorMode === "gradient" ? `` : `- 2px`})`;
+                document.getElementById(toID).style.height = `calc(100% / ${gamepad.h}${gamepad.colorMode === "gradient" ? `` : `- 2px`})`;
                 document.getElementById(toID + "-temp").remove();
               }, 500);
             }, 0);
@@ -374,6 +546,27 @@
         return Math.pow(color1.r - color2.r, 2) + Math.pow(color1.g - color2.g, 2) + Math.pow(color1.b - color2.b, 2);
       }
 
+      async function getData(path, err) {
+
+        let data;
+        const dbref = ref(db);
+
+        await get(child(dbref, path)).then((snapshot) => {
+          if (!snapshot.exists())
+            return;
+
+          data = snapshot.val();
+        }).catch((error) => {
+          err(error);
+          console.error(error);
+        });
+
+        return data;
+      }
+
+      document.getElementById("newGame").addEventListener("click", function() {
+        generateGamepad(9, 11, generateColorArray(2, 2, 200), 3, "gradient");
+      });
       document.getElementById("autoSolve").addEventListener("click", function() {
         autoSolveGamepad();
       });
