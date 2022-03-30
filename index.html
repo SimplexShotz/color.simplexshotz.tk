@@ -359,7 +359,20 @@
           if (animationBuffer.length === 0)
             clearInterval(int);
 
-          set(ref(db, "games/default/gamepad/tiles"), getTiles());
+          let tiles = getTiles();
+          set(ref(db, "games/default/gamepad/tiles"), tiles);
+
+          let i;
+          for (i = 0; i < tiles.length; i++) {
+
+            if (Number(tiles[i].split("-")[1]) !== i % gamepad.w || Number(tiles[i].split("-")[2]) !== Math.floor(i / gamepad.w)) {
+              break;
+            }
+          }
+
+          if (i === tiles.length) {
+            alert("You win!"); // [TODO]
+          }
 
         }, 510);
 
