@@ -157,7 +157,7 @@
 
         let solve = setInterval(function() {
           singleSolve(solve);
-        }, 1000);
+        }, 750);
 
         singleSolve();
       }
@@ -166,13 +166,14 @@
         let tiles = document.getElementsByClassName("tile");
         for (let i = 0; i < tiles.length; i++) {
 
-          console.log(tiles[i].id.split("-")[1]);
-          console.log(i % gamepad.w);
+          console.log(Number(tiles[i].id.split("-")[1]) !== i % gamepad.w);
+          console.log();
           console.log(tiles[i].id.split("-")[2]);
           console.log(Math.floor(i / gamepad.w));
 
           // Tile is in the wrong spot!
-          if (tiles[i].id.split("-")[1] !== i % gamepad.w && tiles[i].id.split("-")[2] !== Math.floor(i / gamepad.w)) {
+          if (Number(tiles[i].id.split("-")[1]) !== i % gamepad.w && Number(tiles[i].id.split("-")[2]) !== Math.floor(i / gamepad.w)) {
+            console.log("G");
             swapTiles(tiles[i].id, `tile-${i % gamepad.w}-${Math.floor(i / gamepad.w)}`, 2);
             return;
           }
