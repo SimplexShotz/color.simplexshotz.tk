@@ -129,8 +129,6 @@
             gamepadCheckDelay = 0;
           }
 
-          console.log(gamepadCheckDelay);
-
           if (gamepadCheckDelay >= 4) {
             loadGamepad();
             gamepadCheckDelay = 0;
@@ -345,6 +343,8 @@
           clearInterval(int);
           return;
         }
+
+        gamepadCheckDelay = 0;
 
         swapTiles(animationBuffer[0].fromID, animationBuffer[0].toID, animationBuffer[0].animate);
 
