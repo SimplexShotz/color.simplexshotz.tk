@@ -1,3 +1,3 @@
 # color.simplexshotz.tk
 
-color.simplexshotz.tk
+https://color.simplexshotz.tk
