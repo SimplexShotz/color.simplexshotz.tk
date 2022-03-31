@@ -100,7 +100,7 @@
       let gamepadCheckDelay = 0;
       let lastMove = 0;
 
-      let v = 1;
+      let v = 1.1;
 
       window.addEventListener("load", async function() {
 
@@ -386,7 +386,7 @@
             clearInterval(int);
 
           let tiles = getTiles();
-          if (tiles.length === gamepad.w * gamepad.h) {
+          if (tiles.length === gamepad.w * gamepad.h && Math.abs((new Date().getTime()) - lastMove) <= 1000) {
             set(ref(db, "games/default/gamepad/tiles"), tiles);
           }
 
