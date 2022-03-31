@@ -80,26 +80,41 @@
 
       // Your web app's Firebase configuration
       const firebaseConfig = {
-        apiKey: "AIzaSyCBJBHVthTul3F3RCQWTj2_vlUlnPtuWjw",
-        authDomain: "colorgame-5245d.firebaseapp.com",
-        projectId: "colorgame-5245d",
-        storageBucket: "colorgame-5245d.appspot.com",
-        messagingSenderId: "699217234331",
-        appId: "1:699217234331:web:ea4f682dad689fc3eb393e"
+        apiKey: "AIzaSyAt8autgppD_CRsjmP5RAvlf5OVOeJcEzA",
+        authDomain: "color-game-d96bb.firebaseapp.com",
+        databaseURL: "https://color-game-d96bb-default-rtdb.firebaseio.com",
+        projectId: "color-game-d96bb",
+        storageBucket: "color-game-d96bb.appspot.com",
+        messagingSenderId: "401739484029",
+        appId: "1:401739484029:web:6df650c71a28891e1d1a14"
       };
 
       // Initialize Firebase
       const app = initializeApp(firebaseConfig);
       const db = getDatabase(app);
 
-      let dragging, gamepad;
+      let dragging, gamepad = {};
       let animationBuffer = [];
       let uid = new Date().getTime() + "_" + Math.floor(Math.random() * 1000000);
       let appliedChanges = [];
       let gamepadCheckDelay = 0;
       let lastMove = 0;
 
+      let v = 1;
+
       window.addEventListener("load", async function() {
+
+        let version = await getData("version", function(err) { console.error(err); });
+        if (version !== v) {
+          location.reload(true);
+        }
+
+        onValue(ref(db, "version"), (snapshot) => {
+          const version = snapshot.val();
+          if (version !== v) {
+            location.reload(true);
+          }
+        });
 
         let changesObj = await getData("games/default/changes", function(err) { console.error(err); });
         for (let i in changesObj) {
@@ -154,7 +169,13 @@
           div = document.createElement("div");
           switch(gamepad.colorMode) {
             case "gradient":
-              col = [getColorAtPos(gamepad.colorArray, { x: x + 0.5, y: y + 0.5, w: gamepad.w, h: gamepad.h }), getColorAtPos(gamepad.colorArray, { x: x, y: y, w: gamepad.w, h: gamepad.h }), getColorAtPos(gamepad.colorArray, { x: x + 1, y: y, w: gamepad.w, h: gamepad.h }), getColorAtPos(gamepad.colorArray, { x: x, y: y + 1, w: gamepad.w, h: gamepad.h }), getColorAtPos(gamepad.colorArray, { x: x + 1, y: y + 1, w: gamepad.w, h: gamepad.h })];
+              col = [
+                getColorAtPos(gamepad.colorArray, { x: x + 0.5, y: y + 0.5, w: gamepad.w, h: gamepad.h }),
+                getColorAtPos(gamepad.colorArray, { x: x, y: y, w: gamepad.w, h: gamepad.h }),
+                getColorAtPos(gamepad.colorArray, { x: x + 1, y: y, w: gamepad.w, h: gamepad.h }),
+                getColorAtPos(gamepad.colorArray, { x: x, y: y + 1, w: gamepad.w, h: gamepad.h }),
+                getColorAtPos(gamepad.colorArray, { x: x + 1, y: y + 1, w: gamepad.w, h: gamepad.h })
+              ];
               div.innerHTML = `<div class="tile" id="tile-${x}-${y}" style="background: linear-gradient(to top left, rgb(${col[4].r}, ${col[4].g}, ${col[4].b}), rgba(${col[0].r}, ${col[0].g}, ${col[0].b}, 0), rgb(${col[1].r}, ${col[1].g}, ${col[1].b})), linear-gradient(to top right, rgb(${col[3].r}, ${col[3].g}, ${col[3].b}), rgba(${col[0].r}, ${col[0].g}, ${col[0].b}, 0), rgb(${col[2].r}, ${col[2].g}, ${col[2].b})) rgba(${col[0].r}, ${col[0].g}, ${col[0].b}, 1); width: calc(100% / ${gamepad.w}); height: calc(100% / ${gamepad.h});" ${gamepad.anchorArray.indexOf(`${x}-${y}`) === -1 ? `draggable="true"` : ``}>${gamepad.anchorArray.indexOf(`${x}-${y}`) !== -1 ? `<div class="anchor"></div>` : ``}</div>`;
             break;
             default:
@@ -179,11 +200,14 @@
 
       }
 
-      function generateGamepad(w, h, colorArray, anchors, colorMode) {
+      async function generateGamepad(w, h, colorArray, anchors, colorMode) {
+
+        await remove(ref(db, "games/default/gamepad/tiles"));
 
         gamepad = {
           w: w,
           h: h,
+          anchors: anchors,
           colorArray: colorArray,
           colorMode: colorMode,
           anchorArray: [],
@@ -319,7 +343,9 @@
         tiles[tiles.indexOf(dragging)] = e.target.id;
         tiles[tempIndex] = dragging;
 
-        set(ref(db, "games/default/gamepad/tiles"), tiles);
+        if (tiles.length === gamepad.w * gamepad.h) {
+          set(ref(db, "games/default/gamepad/tiles"), tiles);
+        }
 
         pushAnimation(dragging, e.target.id, animationBuffer.length > 0 ? 2 : 1);
         animate();
@@ -360,7 +386,9 @@
             clearInterval(int);
 
           let tiles = getTiles();
-          set(ref(db, "games/default/gamepad/tiles"), tiles);
+          if (tiles.length === gamepad.w * gamepad.h) {
+            set(ref(db, "games/default/gamepad/tiles"), tiles);
+          }
 
           let i;
           for (i = 0; i < tiles.length; i++) {
@@ -396,7 +424,9 @@
         let tileArray = [];
         let tiles = document.getElementsByClassName("tile");
         for (let i = 0; i < tiles.length; i++) {
-          tileArray.push(tiles[i].id);
+          if (tiles[i].id.split("-")[3] !== "temp") {
+            tileArray.push(tiles[i].id);
+          }
         }
 
         return tileArray;
@@ -611,7 +641,25 @@
       }
 
       document.getElementById("newGame").addEventListener("click", function() {
-        generateGamepad(9, 11, generateColorArray(2, 2, 200), 3, "gradient");
+
+        let w = gamepad ? gamepad.w : 9, h = gamepad ? gamepad.h : 11, a = gamepad ? gamepad.anchors : 3, hcp = 2, vcp = 2, cs = 200, tt = gamepad ? gamepad.colorMode : "gradient";
+
+        let q1 = prompt("Would you like to change the gamepad settings?");
+        if (q1 && q1.toLowerCase() !== "n" && q1.toLowerCase() !== "no") {
+          w = Number(prompt("Enter a width for the gamepad:")) || 9;
+          h = Number(prompt("Enter a height for the gamepad:")) || 11;
+          a = Number(prompt("Enter a number of anchor points for the gamepad:")) || 3;
+
+          let q2 = prompt("Would you like to set advanced settings?");
+          if (q2 && q2.toLowerCase() !== "n" && q2.toLowerCase() !== "no") {
+            hcp = Number(prompt("Enter the number of horizontal color points to use (2 default).")) || 2;
+            vcp = Number(prompt("Enter the number of vertical color points to use (2 default).")) || 2;
+            cs = Number(prompt("Enter the minimum color separation to use (200 default).")) || 200;
+            tt = prompt(`Enter the tile type to use ("normal" or "gradient"; "gradient" default).`) || "gradient";
+          }
+        }
+
+        generateGamepad(w, h, generateColorArray(hcp, vcp, cs), a, tt);
       });
       document.getElementById("autoSolve").addEventListener("click", function() {
         if (prompt("This feature has been limited because it currently is not fully implemented. Enter the password to continue:") === "S0lv3") {
